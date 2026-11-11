@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>J&#x27;ai construit un outil pour réduire le coût de mes agents. Il l&#x27;a augmenté.</title>
+<meta name="description" content="Seam devait réduire les tours de mes agents de code. Il les a réduits, et la facture a augmenté de 18 %. Ce que j&#x27;ai appris en construisant l&#x27;outil parfait.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="J&#x27;ai construit un outil pour réduire le coût de mes agents. Il l&#x27;a augmenté.">
+<meta property="og:description" content="Seam devait réduire les tours de mes agents de code. Il les a réduits, et la facture a augmenté de 18 %. Ce que j&#x27;ai appris en construisant l&#x27;outil parfait.">
+<meta property="og:url" content="https://blog.bulgarelli.dev/outil-agent-plus-cher/">
+<meta property="og:locale" content="fr_FR">
+<link rel="canonical" href="https://blog.bulgarelli.dev/outil-agent-plus-cher/">
+<style>
+:root{
+  --bg:#fdfdfc; --fg:#1b2227; --muted:#5b676d; --rule:#dfe4e4; --code-bg:#f2f4f4;
+  --accent:#2a6fbf; --quote:#eef3f8;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#12181b; --fg:#e2e8ea; --muted:#99a6ab; --rule:#2a353a; --code-bg:#1b2428;
+  --accent:#6aa8ee; --quote:#18232b;
+}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:17px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:46rem;margin:0 auto;padding:2.5rem 16px 4rem}
+.back,.section{font-size:.9rem}
+.section{color:var(--muted)}
+a{color:var(--accent)}
+h1{font-size:2rem;line-height:1.25;margin:1.2rem 0 .4rem}
+h2{font-size:1.45rem;line-height:1.3;margin:2.6rem 0 .8rem;padding-top:.4rem}
+h3{font-size:1.15rem;margin:2rem 0 .6rem}
+.meta{color:var(--muted);font-size:.9rem;margin-bottom:2rem}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5rem 0}
+blockquote{margin:1.2rem 0;padding:.6rem 1rem;background:var(--quote);border-left:3px solid var(--accent);color:var(--muted)}
+blockquote p{margin:.3rem 0}
+code{font:.86em/1.5 ui-monospace,"IBM Plex Mono",Menlo,Consolas,monospace;background:var(--code-bg);padding:.1em .3em;border-radius:3px;overflow-wrap:anywhere}
+pre{background:var(--code-bg);padding:.9rem 1rem;border-radius:6px;overflow-x:auto;line-height:1.45}
+pre code{background:none;padding:0;overflow-wrap:normal;font-size:.82rem}
+.table-wrap{overflow-x:auto;margin:1.2rem 0}
+table{border-collapse:collapse;font-size:.88rem;min-width:100%}
+th,td{border-bottom:1px solid var(--rule);padding:.45rem .6rem;text-align:left;vertical-align:top}
+th{border-bottom:2px solid var(--rule)}
+figure{margin:1.6rem 0 .4rem}
+figure img{display:block;width:100%;height:auto;border:1px solid var(--rule);border-radius:6px}
+figure + p em{color:var(--muted);font-size:.92rem}
+li{margin:.25rem 0}
+footer{margin-top:3rem;color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="/">← blog.bulgarelli.dev</a> · <span class="section">Articles</span>
+<article>
+<h1>J&#x27;ai construit un outil pour réduire le coût de mes agents. Il l&#x27;a augmenté.</h1>
+<p class="meta">Brice Bulgarelli · 11 novembre 2026 · version longue : <a href="/papers/cout-outil-structurel/">le papier</a></p>
+<p>L'idée de départ vient du fait que j'ai beaucoup observé les agents rédiger un plan pour implémenter un fix ou une nouvelle feature, et j'ai été surpris par le fait qu'il n'existe pas vraiment d'outil généralisé pour récupérer un &quot;flow&quot; de code.</p>
+<p>Dans l'esprit où le dev agentique prend le pas sur l'ensemble de nos processus, il me semblait qu'il y avait un trou à combler de ce côté et que personne ne proposait un outil structurel déterministe qui permet de dérouler une callstack cross-langage, et mesurer les impacts de façon statique sur une base de données / sur des appels APIs externes.</p>
+<p>Avant tout, l'esprit de l'outil reste orienté Web, mais les notions ici peuvent être facilement transposées.</p>
+<h2 id="1-le-faux-départ">1. Le faux départ</h2>
+<p>Je me suis donc lancé sur le développement d'un outil appelé &quot;Seam&quot; qui avait pour but de réduire au maximum les tours effectués par les agents.
+Au bout d'un mois et demi de développement, j'ai pu atteindre un résultat correct sur quelques exemples.</p>
+<p>J'ai donc lancé les mesures sur un repository exemple open source : Keycloak.
+Résultat : 2,7x moins d'appels aux outils, et... 18 % d'augmentation des coûts...</p>
+<h2 id="2-mais-pourquoi-">2. Mais pourquoi ?!</h2>
+<p>Bon, &quot;Seam&quot; est un échec. Est-ce que l'implémentation est en cause ?
+Je me suis mis à creuser, car passer 2 mois au total sur un projet et simplement s'arrêter à un &quot;Bon, ça ne marche pas&quot; est extrêmement frustrant.</p>
+<p>Le réel outcome est peut-être en fait différent, relativement indépendant de la &quot;qualité&quot; de l'outil.</p>
+<h2 id="3-loutil-parfait-sans-jugement-sémantique">3. L'outil parfait, sans jugement sémantique</h2>
+<p>Puis je me suis mis à fabriquer une version &quot;idéale&quot; de l'outil, exempte de jugement sémantique (ce détail est important).</p>
+<p>En fait, il faut savoir que cet outil parfait a provoqué les mêmes résultats.</p>
+<p>Voilà les résultats en incluant les appels après le marqueur de fin de trace de callback :</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>grep</th>
+<th>Seam</th>
+<th>outil parfait</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>appels d'outils</td>
+<td>22,4</td>
+<td>14,4</td>
+<td>20,8</td>
+</tr>
+<tr>
+<td>coût</td>
+<td>1,00x</td>
+<td>1,36–1,42x</td>
+<td>1,13–1,26x</td>
+</tr>
+</tbody>
+</table></div>
+<p>Concrètement, la réduction de tours s'applique, mais bien moins que prévu...
+Ce qui nous amène au premier problème inhérent aux outils de récupération de code :</p>
+<h3 id="1-lagent-re-vérifie-toujours">#1 L'agent re-vérifie toujours</h3>
+<p>Peu importe ce que je mets dans le prompt : après le marqueur &quot;DONE&quot;, la calltrace est complètement terminée. Il n'y a aucune raison de continuer. Et pourtant... Et pourtant l'agent continue à réaliser des appels !
+Il y a d'ailleurs deux phases principales dans le comportement de l'agent :</p>
+<ul>
+<li>Première phase : l'agent pense peu et &quot;drive&quot; l'outil, il fait ses appels successifs afin de récupérer l'ensemble de la calltrace et des bouts de code.</li>
+<li>Deuxième phase : l'agent passe en mode vérification, il effectue des appels supplémentaires sur ce qu'il a déjà et se met à penser de façon intensive. Ce &quot;plancher de vérification&quot; semble structurellement impossible à passer, et ce n'est pas parce qu'on a interdit les appels à &quot;grep&quot; sur les runs de Seam / outil idéal...</li>
+</ul>
+<figure><img src="/papers/cout-outil-structurel/figures/04-verification-floor.svg" alt="Le plancher de vérification" loading="lazy"></figure>
+<h3 id="2-les-coûts-réels-viennent-du-cache-write-sur-les-premiers-tours">#2 Les coûts réels viennent du cache-write sur les premiers tours</h3>
+<p>Il y a une autre variable à laquelle l'outil idéal sans sémantique ne peut échapper : l'output de l'outil étant plus important (c'est un compromis entre volume de payload et nombre de tours...), le cache-write explose bien plus rapidement.</p>
+<figure><img src="/papers/cout-outil-structurel/figures/03-amortisation-inversion.svg" alt="L'inversion de l'amortissement" loading="lazy"></figure>
+<p>1,00 $ par million de tokens par tour à 20 tours, et jusqu'à 10,50 $ à 1 tour...</p>
+<p>La règle empirique : pour que l'outil soit rentable, il faudrait que chaque token qu'un outil ajoute permette d'économiser 20 tokens de relecture. Sauf que Seam économise 5,7 tokens de relecture par token ajouté (donc 3,5x trop peu pour atteindre les 20).</p>
+<h2 id="4-loutil-parfait-avec-jugement-sémantique-réduit-à-sa-réponse-cœur">4. L'outil parfait, avec jugement sémantique, réduit à sa réponse &quot;cœur&quot;</h2>
+<p>Prenons une approche encore plus drastique : on va réduire la réponse de l'outil parfait à son strict minimum (donc on filtre la calltrace à son minimum pour n'exposer que le chemin cherché).
+On expose donc la réponse directe, en un seul appel, ce qui fait un total de payload de ~500 tokens.</p>
+<p>Résultat : 0,45x le prix de grep en moyenne, moins cher sur tous les rounds. Sauf que tout n'est pas si rose : le plancher de vérification est toujours là, et environ 10 appels supplémentaires ont été faits par les agents après avoir eu la réponse finale.
+Et ces vérifications rendent le gain imprévisible : sur un round où l'agent a vérifié 25 fois, le coût est remonté au niveau de grep (0,99x).</p>
+<p>Bref : on est en droit de se poser la question sur la possibilité même d'existence d'un tel outil...</p>
+<h2 id="5-conclusion-et-limites">5. Conclusion et limites</h2>
+<ul>
+<li>Toujours mesurer la facture à l'aide d'un bras idéal avant de réaliser un outil.</li>
+<li>La taille des premiers payloads est extrêmement importante dans la balance.</li>
+<li>L'agent ne peut s'empêcher de re-vérifier, et ceci est peut-être une limite des modèles, ou en particulier de leur entraînement.</li>
+</ul>
+<p>À noter que cette étude a été faite sur un seul repository et une seule tâche, avec 5 rounds sur chaque bras sur Opus, et 3 rounds sur Sonnet (grep et outil idéal seulement). Il est fort possible que le résultat varie en choisissant d'autres repositories et d'autres tâches.
+Mais le calcul et le système de coût se généralisent : une étude de juillet 2026 (<a href="https://arxiv.org/abs/2607.12161">arXiv 2607.12161</a>) montre la direction opposée : la compression de tokens amène à une augmentation de la facture finale.</p>
+<h2 id="6-à-vos-tests">6. À vos tests</h2>
+<ul>
+<li>Le papier complet, plus orienté recherche : <a href="/papers/cout-outil-structurel/">Le (vrai) coût d'un outil de récupération structurelle de code</a></li>
+<li>Le commit taggé de l'étude : <a href="https://github.com/Scorbutics/seam-public/tree/study-structural-limits-v1"><code>study-structural-limits-v1</code></a></li>
+<li>Les transcripts bruts de chaque run : <a href="https://github.com/Scorbutics/seam-public/tree/study-structural-limits-v1/bench/replay-ceiling"><code>bench/replay-ceiling/</code></a></li>
+<li><code>python3 bench/replay-ceiling/verify_independent.py</code> recalcule chaque chiffre à partir des transcripts, en moins d'une seconde.</li>
+<li>L'étude entière a coûté 88 $ de facturation API, runs écartés compris.</li>
+</ul>
+<p><em>Seam, le dispositif de benchmark et les scripts d'analyse ont été écrits avec Claude Code sous ma direction ; ce texte est de ma main, relu et corrigé avec Claude.</em></p>
+
+</article>
+<footer><a href="/">← Retour au blog</a></footer>
+</main>
+</body>
+</html>
