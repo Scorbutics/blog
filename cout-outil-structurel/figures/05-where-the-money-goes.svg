@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 302" width="720" height="302" role="img" aria-labelledby="t d">
+<title id="t">Où va l'argent de l'outil idéal</title>
+<desc id="d">Décomposition de l'écart de coût du bras idéal par rapport au contrôle : écriture cache +0,1321 $, lecture cache −0,0051 $, sortie +0,0047 $, total +0,1317 $ — la prime d'écriture est la totalité du surcoût restant.</desc>
+<style>
+  :root{
+    --ink:#141C22; --ink-soft:#4A585F; --ink-faint:#7C8A90;
+    --rule:#D2DAD9; --rule-soft:#E4EAE9; --panel:#FAFBFB;
+    --arm-a:#2a78d6; --arm-b:#008300; --arm-c:#e87ba4;
+    --premium:#C0761F; --premium-soft:#EBD6BA;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --ink:#E2E9EA; --ink-soft:#9DAAAF; --ink-faint:#6F7D83;
+    --rule:#2A363B; --rule-soft:#212C31; --panel:#182024;
+    --arm-a:#3987e5; --arm-b:#008300; --arm-c:#d55181;
+    --premium:#B8812A; --premium-soft:#4A3820;
+  }}
+  .bg{fill:var(--panel)}
+  .ax{stroke:var(--rule);stroke-width:1;fill:none}
+  .gl{stroke:var(--rule-soft);stroke-width:1;fill:none}
+  .tk{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;fill:var(--ink-faint)}
+  .lb{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;fill:var(--ink);font-weight:500}
+  .lbs{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;fill:var(--ink-soft)}
+  .big{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:14px;fill:var(--ink);font-weight:600}
+  .a{fill:var(--arm-a)} .b{fill:var(--arm-b)} .c{fill:var(--arm-c)} .p{fill:var(--premium)}
+</style>
+<rect class="bg" x="0" y="0" width="720" height="302"/>
+
+  <line class="ax" x1="70" y1="250" x2="700" y2="250"/>
+  <g class="gl">
+    <line x1="70" y1="187" x2="700" y2="187"/><line x1="70" y1="123" x2="700" y2="123"/><line x1="70" y1="60" x2="700" y2="60"/>
+  </g>
+  <g class="tk" text-anchor="end">
+    <text x="64" y="254">0 $</text><text x="64" y="191">0,05 $</text><text x="64" y="127">0,10 $</text><text x="64" y="64">0,15 $</text>
+  </g>
+  <text class="tk" x="10" y="34">écart vs</text><text class="tk" x="10" y="48">contrôle</text>
+
+  <rect x="110" y="83" width="104" height="167" class="p" opacity="0.85"/>
+  <text class="big" x="162" y="74" text-anchor="middle">+0,1321 $</text>
+  <text class="lb" x="162" y="272" text-anchor="middle">ÉCRITURE cache</text>
+  <text class="lbs" x="162" y="289" text-anchor="middle">la prime</text>
+
+  <line x1="214" y1="83" x2="266" y2="83" stroke="var(--ink-faint)" stroke-width="1" stroke-dasharray="3 3"/>
+  <rect x="266" y="83" width="104" height="7" fill="var(--ink-soft)"/>
+  <text class="lbs" x="318" y="74" text-anchor="middle">−0,0051 $</text>
+  <text class="lb" x="318" y="272" text-anchor="middle">lecture cache</text>
+  <text class="lbs" x="318" y="289" text-anchor="middle">≈ zéro</text>
+
+  <line x1="370" y1="90" x2="422" y2="90" stroke="var(--ink-faint)" stroke-width="1" stroke-dasharray="3 3"/>
+  <rect x="422" y="84" width="104" height="6" fill="var(--ink-soft)"/>
+  <text class="lbs" x="474" y="74" text-anchor="middle">+0,0047 $</text>
+  <text class="lb" x="474" y="272" text-anchor="middle">sortie</text>
+  <text class="lbs" x="474" y="289" text-anchor="middle">le thinking est ici</text>
+
+  <line x1="526" y1="84" x2="578" y2="84" stroke="var(--ink-faint)" stroke-width="1" stroke-dasharray="3 3"/>
+  <rect x="578" y="84" width="104" height="166" fill="none" stroke="var(--premium)" stroke-width="2"/>
+  <text class="big" x="630" y="74" text-anchor="middle">+0,1317 $</text>
+  <text class="lb" x="630" y="272" text-anchor="middle">TOTAL</text>
+  <text class="lbs" x="630" y="289" text-anchor="middle">+13 % sur 1,001 $</text>
+
+</svg>
