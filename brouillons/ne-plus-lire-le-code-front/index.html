@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Brouillon — Ne plus lire le code front</title>
+<meta name="description" content="Ce qu&#x27;on mesure quand l&#x27;agent écrit le front : CEGIS plutôt que spec-driven development, trois propriétés d&#x27;une contrainte utile, et un benchmark honnête de ce que rien n&#x27;attrape.">
+<style>
+:root{
+  --bg:#fdfdfc; --fg:#1b2227; --muted:#5b676d; --rule:#dfe4e4; --code-bg:#f2f4f4;
+  --accent:#2a6fbf; --quote:#eef3f8;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#12181b; --fg:#e2e8ea; --muted:#99a6ab; --rule:#2a353a; --code-bg:#1b2428;
+  --accent:#6aa8ee; --quote:#18232b;
+}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:17px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:46rem;margin:0 auto;padding:2.5rem 16px 4rem}
+.back,.section{font-size:.9rem}
+.section{color:var(--muted)}
+a{color:var(--accent)}
+h1{font-size:2rem;line-height:1.25;margin:1.2rem 0 .4rem}
+h2{font-size:1.45rem;line-height:1.3;margin:2.6rem 0 .8rem;padding-top:.4rem}
+h3{font-size:1.15rem;margin:2rem 0 .6rem}
+.meta{color:var(--muted);font-size:.9rem;margin-bottom:2rem}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5rem 0}
+blockquote{margin:1.2rem 0;padding:.6rem 1rem;background:var(--quote);border-left:3px solid var(--accent);color:var(--muted)}
+blockquote p{margin:.3rem 0}
+code{font:.86em/1.5 ui-monospace,"IBM Plex Mono",Menlo,Consolas,monospace;background:var(--code-bg);padding:.1em .3em;border-radius:3px;overflow-wrap:anywhere}
+pre{background:var(--code-bg);padding:.9rem 1rem;border-radius:6px;overflow-x:auto;line-height:1.45}
+pre code{background:none;padding:0;overflow-wrap:normal;font-size:.82rem}
+.table-wrap{overflow-x:auto;margin:1.2rem 0}
+table{border-collapse:collapse;font-size:.88rem;min-width:100%}
+th,td{border-bottom:1px solid var(--rule);padding:.45rem .6rem;text-align:left;vertical-align:top}
+th{border-bottom:2px solid var(--rule)}
+figure{margin:1.6rem 0 .4rem}
+figure img{display:block;width:100%;height:auto;border:1px solid var(--rule);border-radius:6px}
+figure + p em{color:var(--muted);font-size:.92rem}
+li{margin:.25rem 0}
+footer{margin-top:3rem;color:var(--muted);font-size:.9rem}
+.draft{margin:1rem 0 2rem;padding:.7rem 1rem;border:1px dashed var(--accent);border-radius:6px;background:var(--quote);font-size:.92rem}
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="/">← blog.bulgarelli.dev</a> · <span class="section">Brouillons</span>
+<article>
+<h1>Ne plus lire le code front</h1>
+<p class="meta">Brice Bulgarelli · brouillon du 12 novembre 2026</p>
+<p class="draft"><strong>Brouillon.</strong> Première version, non publiée : le texte et les chiffres peuvent encore changer. Merci de ne pas la diffuser sans me demander.</p>
+<h2>Lire la sortie, pas le texte</h2>
+<p>Sur certains de mes projets front, je ne lis plus le code que l&#39;agent écrit. Je lis ce qu&#39;il <strong>déclare</strong>, et je laisse une machine décider si le code tient ces déclarations.</p>
+<p>Cet article part d&#39;une discussion avec amirouche, à propos de <a href="https://hyper.dev/2026/ai-without-ia/">« AI is not IA »</a>. La question posée : peut-on comprendre ce que produit une usine IA ? La réponse proposée là-bas porte sur le code : bb.py, un sous-ensemble de Python où les fonctions sont identifiées par leur contenu, et un callgraph « en dur » qui aiderait humains et harnais à s&#39;y retrouver.</p>
+<p>Je suis arrivé à une conclusion voisine par l&#39;autre bout. Si le programme n&#39;est pas son texte, alors la question utile devient : <strong>quelles entrées et quelles sorties faut-il mesurer pour juger un produit, quand plus personne ne relit le code ?</strong> Pour le front-end, j&#39;ai une réponse partielle, des chiffres qui la relativisent, et un cadre qui explique pourquoi.</p>
+<p>Le cadre a un nom. Ce n&#39;est pas le <em>spec-driven development</em> ; c&#39;est une idée plus ancienne, venue de la synthèse de programmes : <strong>CEGIS</strong>.</p>
+<h2>Le cadre : un synthétiseur, un vérificateur</h2>
+<p>Les agents sont bons pour <strong>générer</strong> et mauvais pour <strong>valider</strong>. La synthèse de programmes connaît ce déséquilibre depuis longtemps, et sa réponse s&#39;appelle CEGIS : <em>counterexample-guided inductive synthesis</em>.</p>
+<p>Le principe tient en trois temps :</p>
+<ol>
+<li>Un synthétiseur propose un programme.</li>
+<li>Un vérificateur l&#39;accepte, ou renvoie un <strong>contre-exemple</strong> : une entrée où le programme a tort.</li>
+<li>Le synthétiseur repropose en tenant compte de ce contre-exemple, et ainsi de suite.</li>
+</ol>
+<p>L&#39;agent est le synthétiseur. Le harnais est le vérificateur. Tout le travail intéressant consiste à construire un vérificateur qui mérite ce nom.</p>
+<p>En pratique, il n&#39;y a pas une boucle mais deux, avec des oracles différents :</p>
+<ul>
+<li><strong>Intention ↔ spécification.</strong> La déclaration capture-t-elle ce que la personne voulait ? Ici, l&#39;oracle est l&#39;humain.</li>
+<li><strong>Spécification ↔ code.</strong> Le code satisfait-il la déclaration ? Ici, l&#39;oracle est la machine.</li>
+</ul>
+<figure><img src="deux-boucles.svg" alt="Deux boucles : l'humain juge la déclaration, la machine juge le code" loading="lazy"></figure>
+
+<p>La boucle de droite est celle que l&#39;outillage sait fermer. La boucle de gauche est celle où vit le risque restant, et c&#39;est là que l&#39;humain doit garder les yeux.</p>
+<h2>Spec-driven development et CEGIS : la spec qu&#39;on lit, la spec qui refuse</h2>
+<p>Le <em>spec-driven development</em> (SDD) a le vent en poupe : on écrit d&#39;abord une spécification, puis un plan, puis des tâches, et l&#39;agent implémente. Des outils comme spec-kit ou Kiro outillent ce déroulé. L&#39;intuition est bonne : l&#39;humain relit un document court plutôt qu&#39;un diff long.</p>
+<p>Mais dans le SDD, la spécification est une <strong>entrée</strong> de la génération. Elle est lue par l&#39;agent, comme un prompt très soigné. Rien dans la boucle ne l&#39;oblige à être <em>tenue</em> : une fois le code écrit, la spec et le code peuvent diverger sans que rien ne casse.</p>
+<p>Dans CEGIS, la spécification est un <strong>vérificateur</strong>. Elle n&#39;existe que dans la mesure où elle peut refuser un programme, et refuser avec un contre-exemple. Le contrôle de contraintes n&#39;est pas une étape ajoutée à la fin : c&#39;est le cœur du design, ce autour de quoi la boucle tourne.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>Spec-driven development</th>
+<th>CEGIS</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rôle de la spec</td>
+<td>Contexte donné au générateur</td>
+<td>Contrainte évaluée sur la sortie</td>
+</tr>
+<tr>
+<td>Ce qui fait avancer la boucle</td>
+<td>La liste de tâches</td>
+<td>Le contre-exemple</td>
+</tr>
+<tr>
+<td>Quand la spec et le code divergent</td>
+<td>Rien ne casse</td>
+<td>La vérification échoue</td>
+</tr>
+<tr>
+<td>Ce que l&#39;humain relit</td>
+<td>La spec, avant génération</td>
+<td>La spec, et son diff à chaque changement</td>
+</tr>
+<tr>
+<td>Question à poser à une phrase de la spec</td>
+<td>« Est-ce clair ? »</td>
+<td>« Qu&#39;est-ce qui la ferait échouer ? »</td>
+</tr>
+</tbody></table></div>
+<p>Les deux ne s&#39;opposent pas. Un SDD bien fait gagne à devenir CEGIS : chaque phrase de la spec qui peut être rendue vérifiable devrait l&#39;être, et celles qui ne le peuvent pas devraient être marquées comme telles. Le reste de cet article est ce que ça donne en front-end.</p>
+<h2>Trois propriétés d&#39;une contrainte utile</h2>
+<p>Un agent est un optimiseur redoutable : il trouvera la solution la plus courte qui satisfait la contrainte, y compris la solution dégénérée. Une contrainte ne sert donc que si elle a trois propriétés.</p>
+<ol>
+<li><strong>Vérifiable.</strong> Le verdict est mécanique et vient avec un contre-exemple exploitable. « Ça a l&#39;air bien » n&#39;est pas un verdict ; « l&#39;étape 2 attendait <em>Staging</em> dans la liste et a trouvé une liste vide » en est un.</li>
+<li><strong>Non vide.</strong> Une contrainte que tout programme satisfait est un cadeau fait au synthétiseur. Un test qui passe encore quand on remplace le composant par un composant qui ne fait rien ne contraint rien.</li>
+<li><strong>Non écrite par le solveur.</strong> Un agent qui écrit le code <em>et</em> ses preuves dans le même contexte corrige sa propre copie. La preuve doit venir d&#39;ailleurs : une donnée capturée, une déclaration relue par un humain, la version précédente, un lecteur sans contexte.</li>
+</ol>
+<p>La troisième est la plus sous-estimée. Je l&#39;ai vue échouer en vrai : un agent a affaibli une assertion jusqu&#39;à ce qu&#39;elle passe ; un autre a modifié le test unitaire de l&#39;application pour qu&#39;il valide son propre bug. Les deux étaient verts.</p>
+<p>Ces trois propriétés servent de grille pour juger n&#39;importe quelle « métrique », front ou non.</p>
+<h2>Ce qu&#39;on mesure en front</h2>
+<p>Pour que le front ait des entrées et des sorties mesurables, il faut d&#39;abord qu&#39;il en ait. C&#39;est le parti pris de motu, l&#39;outil que je construis pour ça : l&#39;UI est découpée en <strong>îlots</strong> (un composant avec des entrées, des sorties et un état), regroupés en <strong>régions</strong> qui partagent des clés déclarées plutôt que de se parler directement.</p>
+<pre><code class="language-ts">islands: [
+  { slot: &#39;search&#39;, element: &#39;x-server-search&#39;,
+    writes: { &#39;term&#39;: &#39;searchTerm&#39; } },   // seul producteur de searchTerm
+  { slot: &#39;list&#39;, element: &#39;x-server-list&#39;,
+    bind: [&#39;searchTerm&#39;] },               // le lit, ne l&#39;écrit pas
+]
+</code></pre>
+<p>Cette déclaration est, au fond, le callgraph « en dur » que défend amirouche, mais pour l&#39;état de l&#39;interface : qui produit quoi, qui lit quoi, quel emplacement affiche quoi. Elle est courte, et c&#39;est elle que je relis. Sur cette base, voici les familles de mesures, rangées par la propriété qu&#39;elles servent.</p>
+<p><strong>Vérifiable</strong></p>
+<ul>
+<li><em>Composition.</em> Un seul producteur par clé, vérifié statiquement en une seconde. Deux agents qui revendiquent la même clé échouent dans leur propre branche.</li>
+<li><em>Flots.</em> Un scénario est une <strong>donnée</strong>, pas un script : un état de départ, une sortie déclarée d&#39;un îlot, puis ce que la région doit contenir et ce que chaque emplacement doit afficher. Pas de sélecteur, pas d&#39;attente, pas de base à réinitialiser.</li>
+<li><em>Appels réseau.</em> Un appel que rien n&#39;a déclaré fait échouer le flot ; un état peut aussi déclarer la liste exacte des appels qu&#39;il a le droit de faire. Une app qui avale un 404 affiche une page plausible ; c&#39;est précisément ce qu&#39;on veut voir échouer.</li>
+<li><em>Responsive et accessibilité.</em> Chaque état est rendu à chaque taille d&#39;écran déclarée, et passé à axe.</li>
+</ul>
+<p><strong>Non vide</strong></p>
+<ul>
+<li><em>Mutation.</em> Chaque étape de flot est rejouée avec un stimulus changé. Si l&#39;assertion tient encore, elle affirme une constante.</li>
+<li><em>Îlot nul.</em> On remplace un îlot par une version qui ignore ses entrées, et on exige qu&#39;au moins une assertion échoue. Sinon, la preuve ne dépend pas de cet îlot.</li>
+<li><em>Scénarios distincts.</em> Deux scénarios qui rendent le même écran sont un seul scénario.</li>
+</ul>
+<p><strong>Non écrite par le solveur</strong></p>
+<ul>
+<li><em>La preuve est une spec.</em> Un diff compare les assertions clause par clause : une assertion supprimée ou raccourcie est signalée comme un <strong>affaiblissement</strong>. Et un changement de comportement sans changement de déclaration est <strong>verrouillé</strong> : l&#39;agent ne peut pas l&#39;excuser lui-même.</li>
+<li><em>Données capturées.</em> Les scénarios sont typés contre les types de l&#39;application, ou nourris par des captures que l&#39;application maintient déjà, plutôt que des fixtures inventées.</li>
+<li><em>Un regard frais.</em> Un agent neuf, sans le diff ni la conversation, reçoit l&#39;URL d&#39;un état et la question : <em>cet écran appartient-il à cette application ?</em> Le même exercice s&#39;applique à la déclaration : <em>qu&#39;est-ce que cette région permet qu&#39;une personne raisonnable n&#39;attendrait pas ?</em></li>
+</ul>
+<p>Ce dernier point est le seul qui attrape une <strong>invention</strong> plutôt qu&#39;une dérive. Deux fois, il a trouvé ce qu&#39;aucune assertion ne pouvait voir : une fixture qui inventait un vocabulaire que l&#39;app n&#39;utilise pas, et une feuille de style empaquetée mais jamais appliquée. Les assertions comparent l&#39;artefact à lui-même ; le rendu, lu par quelqu&#39;un qui ne l&#39;a pas écrit, le compare au monde.</p>
+<p>Enfin, chaque état déclaré a une <strong>adresse</strong> : une URL qu&#39;on ouvre, qu&#39;on partage, qu&#39;on donne à relire. La suite de tests est aussi l&#39;index des écrans de l&#39;application.</p>
+<h2>Le bench : ce que rien n&#39;attrape</h2>
+<blockquote>
+<p><strong>À mettre à jour</strong> : chiffres de la mesure précédente (motu <code>1ec1a94</code>). Un nouveau run sur l&#39;état actuel est en cours ; remplacer le tableau et les lignes « attrapé par rien » par ses résultats.</p>
+</blockquote>
+<p>Une liste de métriques ne prouve rien tant qu&#39;on ne l&#39;a pas opposée à des erreurs réelles. J&#39;ai donc mesuré. Cible : la page « Manage servers » de shlink-web-client, découpée en une recherche et une liste qui partagent un terme. On compare motu à Storybook, et aux tests de l&#39;application elle-même.</p>
+<p>Le point décisif est le protocole. Douze erreurs ont été choisies <strong>à l&#39;aveugle</strong>, par un agent à qui on n&#39;a rien dit des deux outils. Choisir soi-même les erreurs que son outil doit attraper, c&#39;est écrire l&#39;examen dont on connaît les réponses.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Erreurs choisies à l&#39;aveugle (12)</th>
+<th>Refusées</th>
+<th>Signalées</th>
+<th>Attrapées par rien</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>motu</td>
+<td>0</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Storybook</td>
+<td>1</td>
+<td>0</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Tous outils confondus, tests de l&#39;app compris</td>
+<td>—</td>
+<td>—</td>
+<td>8</td>
+</tr>
+</tbody></table></div>
+<p><strong>Huit sur douze ne sont attrapées par rien.</strong> C&#39;est le résultat, et il est plus petit que n&#39;importe quel pitch. Ce qui passe entre les mailles est instructif :</p>
+<ul>
+<li><em>Un comportement qui s&#39;accorde avec lui-même.</em> Tous les termes de recherche utilisés apparaissent aussi dans le nom d&#39;un serveur ; casser la recherche sur l&#39;URL ne change donc rien de visible.</li>
+<li><em>Ce qu&#39;aucun harnais ne fait.</em> Aucun ne navigue ailleurs puis revient ; un terme de recherche qui survit à la navigation passe partout.</li>
+<li><em>Un échec qui ressemble à un succès.</em> Un état « erreur » transformé en liste vide se rend exactement comme une liste vide.</li>
+</ul>
+<p>Les deux outils sont des <strong>instruments différents</strong>. Storybook pilote de vrais événements utilisateur : il attrape un champ de recherche dont le handler ignore ce qui est tapé, que motu ne voit pas (ses flots entrent dans la région <em>après</em> le handler). motu compare la preuve à la page : il attrape une page qui a sorti la liste de la région, que Storybook ne voit pas (il compose ses propres histoires).</p>
+<p>Le bench a aussi trouvé un bug <strong>dans le vérificateur</strong> : la mutation comptait comme « tué » un mutant qui faisait planter la page. Une assertion constante passait donc le contrôle. Corrigé depuis ; c&#39;est exactement le genre de chose qu&#39;on ne trouve qu&#39;en mesurant contre des erreurs qu&#39;on n&#39;a pas choisies.</p>
+<h2>Vert ne suffit pas : dire combien a été vérifié</h2>
+<p>Un rapport vert dit « rien n&#39;a contredit ce qui a été vérifié ». Il ne dit pas combien a été vérifié, et le lecteur suppose toujours « tout ».</p>
+<p>La réponse est d&#39;inverser l&#39;axe du rapport. Au lieu d&#39;une ligne par <strong>contrôle</strong> (ok, avertissement, sauté), une ligne par <strong>chose déclarée</strong>, avec la preuve la plus forte qui la tient :</p>
+<pre><code>search · writes.searchTerm   runtime·emit   flot « filtrer » étape 1 — le handler n&#39;est jamais piloté
+search · slot list           runtime        expectRender, survit à l&#39;îlot nul
+search · slot banner         static         placé, rendu ; aucun flot ne le distingue
+</code></pre>
+<p>Les niveaux vont de <code>unchecked</code> à <code>static</code>, <code>runtime·emit</code>, puis <code>runtime·user</code>. La différence entre les deux derniers est exactement la faille que le bench a mesurée : une sortie prouvée via <code>emit</code> est entrée après le handler, une sortie prouvée via un clic a été produite par le composant lui-même.</p>
+<p>Ce que ça change : le résidu n&#39;est plus caché sous un vert, il est <strong>affiché</strong>. Une personne peut alors décider : écrire un test unitaire pour ce handler, ou accepter le risque en connaissance de cause. C&#39;est aussi la surface de relecture de la boucle de gauche : on n&#39;approuve pas seulement une déclaration, on approuve une déclaration <em>et</em> la part de celle-ci qui est réellement tenue.</p>
+<p>Et il faut dire la limite clairement : tout cela vérifie la <strong>composition</strong>. La logique à l&#39;intérieur d&#39;un composant — un filtre qui teste <code>some</code> au lieu de <code>every</code>, un off-by-one — relève des tests unitaires de l&#39;application. Ce sont deux instruments, il faut les deux.</p>
+<h2>Au-delà du front : les exigences d&#39;abord, l&#39;implémentation libre</h2>
+<p>Le front a un avantage : l&#39;écran est une sortie qu&#39;on peut regarder. Pour la logique métier, j&#39;explore la même boucle sous une forme plus stricte, dans une expérience encore en cours.</p>
+<p>Le sujet : une formule de dégâts de jeu, portée en Rust. Le code est <strong>généré et jamais relu</strong>. L&#39;humain relit un seul fichier, un fichier d&#39;exigences : les entrées et leur domaine, des clauses en prose accompagnées d&#39;une règle formelle, leur provenance, les questions ouvertes et des exemples. Une porte décide ensuite mécaniquement si tout le reste tient.</p>
+<p>Chaque clause reçoit un niveau, et le rapport le dit :</p>
+<ul>
+<li><strong>prouvée</strong> : une preuve (Verus) la tient sur toutes les entrées du domaine ;</li>
+<li><strong>testée (N)</strong> : elle tient sur N entrées, sans preuve ;</li>
+<li><strong>non vérifiée</strong> : rien ne l&#39;exerce, et c&#39;est écrit plutôt que sous-entendu.</li>
+</ul>
+<p>Les trois propriétés y sont poussées plus loin. Les énoncés des preuves sont <strong>générés depuis les règles</strong>, et l&#39;agent n&#39;écrit que les corps de preuve : il ne peut pas reformuler ce qu&#39;il doit démontrer. L&#39;oracle différentiel est le code Ruby d&#39;origine, chargé tel quel. Et une clause dont le texte a changé sans nouvelle approbation humaine est marquée comme mesurée contre une spec non approuvée.</p>
+<p>C&#39;est la boucle de gauche prise au sérieux : l&#39;humain ne juge plus le code, il juge des exigences courtes, et sait pour chacune jusqu&#39;où elle est tenue. Je n&#39;ai pas encore de chiffres à donner sur ce que ça coûte et ce que ça attrape ; ce sera un autre article.</p>
+<h2>Le même geste côté backend : assay</h2>
+<p>Le front a l&#39;écran ; une opération backend n&#39;a pas de sortie qu&#39;on peut regarder. Son effet réel, c&#39;est ce qu&#39;elle a fait à la base de données, et c&#39;est invisible depuis la réponse HTTP comme depuis le source. assay, un autre outil que je construis, applique la même boucle à ce niveau : <em>découvrir, déclarer, vérifier</em>.</p>
+<p>Une opération (une Edge Function, une route d&#39;API) y joue le rôle de l&#39;îlot. En production, un petit module enregistre pour chaque requête SQL quelle table a été lue ou écrite, sur quelles colonnes on a filtré, si la sécurité au niveau ligne était contournée, et la <strong>forme</strong> des données envoyées — jamais les valeurs. Ce journal est comparé à un fichier de déclaration, et l&#39;écart fait échouer la porte.</p>
+<p>On y retrouve les trois propriétés :</p>
+<ul>
+<li><strong>Vérifiable.</strong> Un changement de ce que touche une opération se lit en trois lignes (<code>+ writes: audit_log</code>) au lieu de quatre cents lignes de handler. C&#39;est ces trois lignes que l&#39;humain relit.</li>
+<li><strong>Non vide.</strong> La couverture compte par <strong>branche</strong>, pas par opération. Une opération n&#39;avait jamais été pilotée qu&#39;avec l&#39;envoi d&#39;emails désactivé : son écriture dans la table des emails n&#39;avait jamais été observée, donc jamais déclarée. Élargir ce seul scénario a fait passer son corpus de 15 à 119 requêtes.</li>
+<li><strong>Non écrite par le solveur.</strong> C&#39;est la piste la plus intéressante pour cet article. De plus en plus, personne n&#39;est devant le terminal : ce qui arrive à l&#39;humain, c&#39;est la phrase de l&#39;agent, <em>« j&#39;ai lancé les vérifications, tout est vert »</em>. Cette phrase est infalsifiable. <code>assay attest</code> produit donc une page <strong>écrite par l&#39;outil, pas par l&#39;agent</strong> : la liste des étapes est figée et ne peut pas être réduite en ligne de commande, une étape qui n&#39;a pas tourné est affichée avec sa raison, et le verdict n&#39;est jamais <code>PASS</code> si un niveau n&#39;a pas tourné : il devient <code>INCOMPLETE</code>.</li>
+</ul>
+<p>Les deux outils se rejoignent sur une couture précise. Côté front, motu remplace le backend par des réponses choisies : il prouve que l&#39;écran se comporte bien <em>si</em> le backend répond telle forme. Côté backend, assay prouve quelle forme l&#39;opération envoie réellement. Chacun tient une moitié de l&#39;hypothèse ; ensemble, ils la ferment. Reste un trou que je ne cache pas : un client qui interroge la base directement, sans passer par une opération, n&#39;est déclaré par aucun des deux.</p>
+<p>L&#39;ouverture que ça suggère dépasse les deux outils : <strong>le rapport de vérification est lui-même une sortie à mesurer</strong>, et il ne doit pas passer par la bouche de celui qui a été vérifié.</p>
+<h2>Où l&#39;humain regarde encore</h2>
+<p>Alors, le code a-t-il encore de l&#39;importance ? Oui, mais ce n&#39;est plus là que l&#39;humain doit regarder. Ce qui doit être court, lisible et relu, c&#39;est la <strong>déclaration</strong> : ce que la région promet, qui possède chaque état, ce que chaque écran doit montrer.</p>
+<p>Sur ce point, je rejoins amirouche plus que je ne m&#39;en écarte. Un callgraph « en dur » et une déclaration de région répondent au même besoin : rendre la structure explicite, pour que ni l&#39;humain ni le harnais n&#39;aient à la reconstituer à coups de grep. La différence est le niveau auquel on la fixe, et ce qu&#39;on lui demande : être lue, ou pouvoir refuser.</p>
+<p>Ce que je retiens, pour qui veut juger un produit qu&#39;il n&#39;a pas écrit :</p>
+<ol>
+<li><strong>Une spec qui ne peut pas refuser est un prompt.</strong> Le passage du SDD à CEGIS, c&#39;est demander à chaque phrase ce qui la ferait échouer.</li>
+<li><strong>Mesurez votre vérificateur contre des erreurs que vous n&#39;avez pas choisies.</strong> Sinon, vous mesurez votre imagination.</li>
+<li><strong>Affichez ce qui n&#39;est pas vérifié.</strong> Un vert sans périmètre est pire qu&#39;un rouge.</li>
+<li><strong>Le dernier regard n&#39;est pas celui de l&#39;auteur.</strong> Ni humain fatigué, ni agent qui a tout construit : un lecteur frais, qui n&#39;a reçu que l&#39;écran et la question.</li>
+</ol>
+<p>La question de départ reste ouverte, et c&#39;est tant mieux : <em>quelles sont les entrées et sorties mesurables d&#39;un produit ?</em> Pour le front, j&#39;ai une première réponse et une mesure honnête de ses limites. Pour le reste, l&#39;expérience continue.</p>
+
+</article>
+<footer><a href="/">← Retour au blog</a></footer>
+</main>
+</body>
+</html>
