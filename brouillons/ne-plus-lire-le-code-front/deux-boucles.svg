@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 262" role="img" aria-label="Deux boucles : l’humain juge la déclaration, la machine juge le code" font-family="system-ui,-apple-system,'Segoe UI',Roboto,sans-serif" font-size="13">
+<style>
+  .bg{fill:#fdfdfc}.ink{fill:#1b2227}.quiet{fill:#5b676d}.edge{stroke:#9aa5aa}.head{fill:#9aa5aa}
+  .accent{stroke:#2a6fbf;fill:#2a6fbf;fill-opacity:.12}
+  @media (prefers-color-scheme:dark){
+    .bg{fill:#12181b}.ink{fill:#e2e8ea}.quiet{fill:#99a6ab}.edge{stroke:#5d6a70}.head{fill:#5d6a70}
+    .accent{stroke:#6aa8ee;fill:#6aa8ee;fill-opacity:.16}
+  }
+</style>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head" d="M0 0L10 5L0 10z"/></marker></defs>
+<rect class="bg" width="760" height="262"/>
+<text class="ink" x="24" y="34" font-size="15" font-weight="600">Deux boucles : l’humain juge la déclaration, la machine juge le code</text>
+<g class="edge" fill="none" stroke-width="1.25">
+  <path d="M210 120H290" marker-end="url(#a)"/>
+  <path d="M470 120H550" marker-end="url(#a)"/>
+  <path d="M350 148V190H150V148" marker-end="url(#a)"/>
+  <path d="M610 148V190H410V148" marker-end="url(#a)"/>
+</g>
+<rect class="edge" x="30" y="92" width="180" height="56" rx="8" fill="none" stroke-width="1.25"/>
+<rect class="accent" x="290" y="92" width="180" height="56" rx="8" stroke-width="2"/>
+<rect class="edge" x="550" y="92" width="180" height="56" rx="8" fill="none" stroke-width="1.25"/>
+<g text-anchor="middle">
+  <text class="ink" x="120" y="116" font-weight="600">Intention</text>
+  <text class="quiet" x="120" y="134" font-size="11.5">ce que la personne veut</text>
+  <text class="ink" x="380" y="116" font-weight="600">Déclaration</text>
+  <text class="ink" x="380" y="134" font-size="11.5">régions, flots, exigences</text>
+  <text class="ink" x="640" y="116" font-weight="600">Code</text>
+  <text class="quiet" x="640" y="134" font-size="11.5">généré, jamais relu</text>
+  <text class="quiet" x="250" y="80" font-size="11.5">l’agent rédige</text>
+  <text class="quiet" x="510" y="80" font-size="11.5">l’agent génère</text>
+  <text class="quiet" x="250" y="208" font-size="11.5">ambiguïté → question à l’humain</text>
+  <text class="quiet" x="510" y="208" font-size="11.5">contre-exemple → nouvelle proposition</text>
+  <text class="ink" x="250" y="236" font-weight="600">oracle : l’humain</text>
+  <text class="ink" x="510" y="236" font-weight="600">oracle : la machine</text>
+</g>
+</svg>
