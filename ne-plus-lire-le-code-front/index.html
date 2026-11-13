@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ne plus lire le code front</title>
+<meta name="description" content="Quand plus personne ne relit le code : CEGIS plutôt que spec-driven development, trois propriétés d&#x27;une contrainte utile, motu pour le front, assay pour le backend, et un benchmark de ce que rien n&#x27;attrape.">
+<style>
+:root{
+  --bg:#fdfdfc; --fg:#1b2227; --muted:#5b676d; --rule:#dfe4e4; --code-bg:#f2f4f4;
+  --accent:#2a6fbf; --quote:#eef3f8;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#12181b; --fg:#e2e8ea; --muted:#99a6ab; --rule:#2a353a; --code-bg:#1b2428;
+  --accent:#6aa8ee; --quote:#18232b;
+}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:17px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:46rem;margin:0 auto;padding:2.5rem 16px 4rem}
+.back,.section{font-size:.9rem}
+.section{color:var(--muted)}
+a{color:var(--accent)}
+h1{font-size:2rem;line-height:1.25;margin:1.2rem 0 .4rem}
+h2{font-size:1.45rem;line-height:1.3;margin:2.6rem 0 .8rem;padding-top:.4rem}
+h3{font-size:1.15rem;margin:2rem 0 .6rem}
+.meta{color:var(--muted);font-size:.9rem;margin-bottom:2rem}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5rem 0}
+blockquote{margin:1.2rem 0;padding:.6rem 1rem;background:var(--quote);border-left:3px solid var(--accent);color:var(--muted)}
+blockquote p{margin:.3rem 0}
+code{font:.86em/1.5 ui-monospace,"IBM Plex Mono",Menlo,Consolas,monospace;background:var(--code-bg);padding:.1em .3em;border-radius:3px;overflow-wrap:anywhere}
+pre{background:var(--code-bg);padding:.9rem 1rem;border-radius:6px;overflow-x:auto;line-height:1.45}
+pre code{background:none;padding:0;overflow-wrap:normal;font-size:.82rem}
+.table-wrap{overflow-x:auto;margin:1.2rem 0}
+table{border-collapse:collapse;font-size:.88rem;min-width:100%}
+th,td{border-bottom:1px solid var(--rule);padding:.45rem .6rem;text-align:left;vertical-align:top}
+th{border-bottom:2px solid var(--rule)}
+figure{margin:1.6rem 0 .4rem}
+figure img{display:block;width:100%;height:auto;border:1px solid var(--rule);border-radius:6px}
+figure + p em{color:var(--muted);font-size:.92rem}
+li{margin:.25rem 0}
+footer{margin-top:3rem;color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="/">← blog.bulgarelli.dev</a>
+<article>
+<h1>Ne plus lire le code front</h1>
+<p class="meta">Brice Bulgarelli · 13 novembre 2026</p>
+<h2>Lire la sortie, pas le code</h2>
+<p>Depuis quelques mois, j&#39;ai fait machine arrière sur la vision globale que j&#39;avais sur le développement.</p>
+<p>Je me suis rendu compte que je ne lis plus le code que l&#39;agent écrit, dans bien de cas.</p>
+<p>Évidemment, il y a une grande part et une notion de &quot;confiance&quot; dans tout ceci.</p>
+<h2>Le sujet de la confiance</h2>
+<p>La vraie question serait: Quelles sont réellement les mesures auxquelles nous pouvons avoir accès et qui nous permettent d&#39;assurer la validité d&#39;un produit?</p>
+<p>Tout de suite, on se dit déjà:</p>
+<ul>
+<li>la lecture du code</li>
+<li>la vérification par construction (impossibilité de compiler quelque chose d&#39;invalide)</li>
+<li>les tests unitaires et ses résultats (mais au final, il faut lire le code des tests unitaires ou s&#39;assurer de jeux de données robustes...)</li>
+<li>le comportement observé du système, dans le sens &quot;Entrée A donne Sortie B&quot;</li>
+<li>la vérification visuelle, car lire du HTML / CSS a ses limites</li>
+<li>... Probablement bien d&#39;autres, et dépendants de chaque contexte et paradigmes..</li>
+</ul>
+<p>Et certains de ces différents points de vérification peuvent être intégrés dans un système orienté et fait pour cela.</p>
+<p>Mon approche: s&#39;inspirer de <strong>CEGIS</strong>.</p>
+<h2>Le cadre : un synthétiseur, un vérificateur</h2>
+<p>Les agents sont bons pour <strong>générer</strong> et mauvais pour <strong>valider</strong>. La synthèse de programmes connaît ce déséquilibre depuis longtemps, et sa réponse s&#39;appelle CEGIS : <em>counterexample-guided inductive synthesis</em>.</p>
+<p>Le principe tient en trois temps :</p>
+<ol>
+<li>Un synthétiseur propose un programme.</li>
+<li>Un vérificateur l&#39;accepte, ou renvoie un <strong>contre-exemple</strong> : une entrée où le programme a tort.</li>
+<li>Le synthétiseur repropose en tenant compte de ce contre-exemple, et ainsi de suite.</li>
+</ol>
+<p>L&#39;agent est le synthétiseur. Le harnais est le vérificateur. Tout le travail intéressant consiste à construire un vérificateur qui mérite ce nom.</p>
+<p>En pratique, il n&#39;y a pas une boucle mais deux, avec des oracles différents :</p>
+<ul>
+<li><strong>Intention ↔ spécification.</strong> La déclaration capture-t-elle ce que la personne voulait ? Ici, l&#39;oracle est l&#39;humain.</li>
+<li><strong>Spécification ↔ code.</strong> Le code satisfait-il la déclaration ? Ici, l&#39;oracle est la machine.</li>
+</ul>
+<figure><img src="deux-boucles.svg" alt="Deux boucles : l'humain juge la déclaration, la machine juge le code" loading="lazy"></figure>
+<p>La boucle de droite est celle que l&#39;outillage sait fermer. La boucle de gauche est celle où vit le risque restant, et c&#39;est là que l&#39;humain doit garder les yeux.</p>
+<h2>Spec-driven development et CEGIS : la spec qu&#39;on lit, la spec qui refuse</h2>
+<p>Le <em>spec-driven development</em> (SDD) a le vent en poupe : on écrit d&#39;abord une spécification, puis un plan, puis des tâches, et l&#39;agent implémente. Des outils comme spec-kit ou Kiro outillent ce déroulé.</p>
+<p>Le souci que je vois avec la SDD, c&#39;est que la spécification est une <strong>entrée</strong> de la génération. Elle est lue par l&#39;agent, comme un prompt très soigné.</p>
+<p>Mais une fois la spécification envoyée dans le mécanisme, rien ne l&#39;oblige à être <em>respectée</em> : une fois le code écrit, la spec et le code peuvent diverger sans que rien ne casse.</p>
+<p>Dans un cadre CEGIS, la spécification est un <strong>vérificateur</strong>. Elle n&#39;existe que dans la mesure où elle peut refuser un programme, et refuser avec un contre-exemple. Le contrôle de contraintes n&#39;est pas une étape ajoutée à la fin : c&#39;est le cœur du design, ce autour de quoi la boucle tourne.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>Spec-driven development</th>
+<th>CEGIS</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rôle de la spec</td>
+<td>Contexte donné au générateur</td>
+<td>Contrainte évaluée sur la sortie</td>
+</tr>
+<tr>
+<td>Ce qui fait avancer la boucle</td>
+<td>La liste de tâches</td>
+<td>Le contre-exemple</td>
+</tr>
+<tr>
+<td>Quand la spec et le code divergent</td>
+<td>Rien ne casse</td>
+<td>La vérification échoue</td>
+</tr>
+<tr>
+<td>Ce que l&#39;humain relit</td>
+<td>La spec, avant génération</td>
+<td>La spec, et son diff à chaque changement</td>
+</tr>
+<tr>
+<td>Question à poser à une phrase de la spec</td>
+<td>« Est-ce clair ? »</td>
+<td>« Qu&#39;est-ce qui la ferait échouer ? »</td>
+</tr>
+</tbody></table></div>
+<p>Au final, CEGIS c&#39;est un peu la version &quot;idéale&quot; du SDD : chaque phrase de la spec qui peut être rendue vérifiable devrait l&#39;être, et celles qui ne le peuvent pas devraient être marquées comme telles.</p>
+<h2>Trois propriétés d&#39;une contrainte utile</h2>
+<p>Un agent est un optimiseur redoutable : il trouvera la solution la plus courte qui satisfait la contrainte, y compris la solution dégénérée. Une contrainte ne sert donc que si elle a trois propriétés.</p>
+<ol>
+<li><strong>Vérifiable.</strong> Le verdict est mécanique et vient avec un contre-exemple exploitable, mesurable.</li>
+<li><strong>Non vide.</strong> Une contrainte que tout programme satisfait est un cadeau fait au synthétiseur. Il faut de la sévérité.</li>
+<li><strong>Non écrite par le solveur.</strong> Un agent qui écrit le code <em>et</em> ses preuves dans le même contexte corrige sa propre copie. On sait très bien qu&#39;un propre agent est structurellement &quot;biaisé&quot; vis-à-vis du jugement.</li>
+</ol>
+<p>Ces trois propriétés servent de grille pour juger n&#39;importe quelle « métrique », front ou non.</p>
+<h2>Ce qu&#39;on mesure en front</h2>
+<p>Pour que le front ait des entrées et des sorties mesurables, il faut d&#39;abord qu&#39;il en ait. C&#39;est le parti pris de motu, l&#39;outil que je construis pour ça : l&#39;UI est découpée en <strong>&quot;islands&quot;</strong> (un composant avec des entrées, des sorties et un état), regroupés en <strong>&quot;regions&quot;</strong> qui partagent des clés déclarées plutôt que de se parler directement.</p>
+<pre><code class="language-ts">islands: [
+  { slot: &#39;search&#39;, element: &#39;x-server-search&#39;,
+    writes: { &#39;term&#39;: &#39;searchTerm&#39; } },   // seul producteur de searchTerm
+  { slot: &#39;list&#39;, element: &#39;x-server-list&#39;,
+    bind: [&#39;searchTerm&#39;] },               // le lit, ne l&#39;écrit pas
+]
+</code></pre>
+<p>Cette déclaration est: qui produit quoi, qui lit quoi, et quel emplacement affiche quoi.</p>
+<p>Sur cette base, voici les familles de mesures, rangées par la propriété qu&#39;elles servent.</p>
+<p><strong>Vérifiable</strong></p>
+<ul>
+<li><em>Composition.</em> Il n&#39;y a qu&#39;un seul producteur par clé. Deux agents en parallèle qui revendiquent la même clé échouent dans leur propre branche.</li>
+<li><em>Flows.</em> Un scénario est une <strong>donnée</strong>, pas un script : un état de départ, une sortie déclarée d&#39;une &quot;island&quot;, puis ce que la région doit contenir et ce que chaque emplacement doit afficher.</li>
+<li><em>Appels réseau / backend.</em> Un appel que rien n&#39;a déclaré fait échouer le flow. Un état peut aussi déclarer la liste exacte des appels qu&#39;il a le droit de faire.</li>
+<li><em>Responsive et accessibilité.</em> Chaque état est rendu à chaque taille d&#39;écran déclarée, une étape de vérification d&#39;affichage au format mobile est intégrée.</li>
+</ul>
+<p><strong>Non vide</strong></p>
+<ul>
+<li><em>Mutation.</em> Chaque étape du flow est rejouée avec un stimulus changé. Si l&#39;assertion tient encore, elle affirme une constante.</li>
+<li><em>Island nulle.</em> On remplace une island par une version qui ignore ses entrées, et on exige qu&#39;au moins une assertion échoue. Si ce test échoue, on considère que l&#39;island n&#39;est pas responsable dans le test effectué.</li>
+<li><em>Scénarios distincts.</em> Deux scénarios qui rendent le même écran sont un seul scénario.</li>
+</ul>
+<p><strong>Non écrite par le solveur</strong></p>
+<ul>
+<li><em>La preuve est une spec.</em> Un diff compare les assertions clause par clause : une assertion supprimée ou raccourcie est signalée comme un <strong>affaiblissement</strong>. Et un changement de comportement sans changement de déclaration est <strong>verrouillé</strong>.</li>
+<li><em>Données capturées.</em> Les scénarios sont typés contre les types de l&#39;application, ou nourris par des captures que l&#39;application maintient déjà, plutôt que des fixtures inventées.</li>
+<li><em>Un regard neuf.</em> Un agent externe, sans le diff ni la conversation, reçoit l&#39;URL d&#39;un état et la question : <em>cet écran appartient-il à cette application ?</em> Le même exercice s&#39;applique à la déclaration : <em>qu&#39;est-ce que cette région permet qu&#39;une personne raisonnable n&#39;attendrait pas ?</em></li>
+</ul>
+<p>Ce dernier point est le seul qui attrape une <strong>invention</strong> plutôt qu&#39;une dérive.</p>
+<p>Enfin, chaque état déclaré est <strong>adressable</strong> : une URL qu&#39;on ouvre, qu&#39;on partage, qu&#39;on donne à relire. La suite de tests est aussi l&#39;index des écrans de l&#39;application.</p>
+<p>Pour le voir en live : la lagoon de l&#39;application de démo est publique, sur <a href="https://motu.bulgarelli.dev">motu.bulgarelli.dev</a>. Chaque commit publié y expose l&#39;ensemble de ses états déclarés, chacun à sa propre URL. On ouvre un écran précis, à une version précise, sans rien installer ni lancer, exemple avec un cas précis <a href="https://motu.bulgarelli.dev/Scorbutics/motu-demo-app/latest/all?screen=directory&state=members.flow.a-search-and-a-plan-narrow-together">ici</a>.</p>
+<h2>Le bench : Storybook, motu, le reste</h2>
+<p>Afin de rendre le projet réel, vérifiable, et donc digne d&#39;intérêt, j&#39;ai voulu mettre en place un benchmark, dont le protocole est le suivant: douze erreurs ont été choisies <strong>à l&#39;aveugle</strong>, par un agent à qui on n&#39;a rien dit des deux outils, car faire choisir les erreurs par un agent qui connaît le benchmark / protocole lui-même est déjà un biais en tant que tel.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Erreurs choisies à l&#39;aveugle (12)</th>
+<th>Refusées</th>
+<th>Signalées</th>
+<th>Attrapées par rien</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>motu</td>
+<td>0</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Storybook</td>
+<td>1</td>
+<td>0</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Tous outils confondus, tests de l&#39;app compris</td>
+<td>—</td>
+<td>—</td>
+<td>9</td>
+</tr>
+</tbody></table></div>
+<p>Premier résultat: <strong>Neuf sur douze ne sont attrapées par rien.</strong></p>
+<p>Pourquoi ?!</p>
+<p>Le résultat est assez instructif :</p>
+<ul>
+<li><em>Un comportement qui s&#39;accorde avec lui-même.</em> Tous les termes de recherche utilisés apparaissent aussi dans le nom d&#39;un serveur. Casser la recherche sur l&#39;URL ne change donc rien de visible.</li>
+<li><em>Ce qu&#39;aucun harnais ne fait.</em> Aucun ne navigue ailleurs puis revient. Un terme de recherche qui survit à la navigation passe partout.</li>
+<li><em>Un échec qui ressemble à un succès.</em> Un état « erreur » transformé en liste vide se rend exactement comme une liste vide.</li>
+</ul>
+<p>De manière générale, Storybook et motu sont des instruments différents, qui agissent à plusieurs niveaux.</p>
+<ul>
+<li>Storybook pilote des événements utilisateurs, il s&#39;occupe du comportement interne d&#39;un composant et s&#39;assure que tout est transmis. Lorsque je tape &quot;Test&quot; dans un champ de texte, Storybook peut dérouler ses vérifications.</li>
+<li>Motu vient au niveau du dessus: peu importe d&#39;où vient le &quot;Test&quot;, ce qui importe c&#39;est le TRANSPORT, d&#39;où l&#39;image de navigation et flow très présente dans le framework. On doit s&#39;assurer que &quot;Test&quot; a bien été transmis à une autre island, ou au backend.</li>
+</ul>
+<p>=&gt; Ces neuf erreurs ont un point commun : elles vivent à l&#39;intérieur d&#39;un composant. Une recherche qui compare le mauvais champ, un état qui n&#39;est pas remis à zéro, une erreur avalée en liste vide : l&#39;écran reste plausible, et ce qui circule entre les islands est intact. Ni Storybook ni motu ne regardent là. C&#39;est le terrain des <strong>tests unitaires</strong>, et dans ce bench, ceux de l&#39;application ne couvraient pas ces cas.</p>
+<p>Le bench ne départage donc pas Storybook et motu : il montre trois niveaux qui se complètent. Les tests unitaires pour la logique d&#39;un composant, Storybook pour ses réactions aux événements, motu pour ce qui circule entre les composants. Aucun des trois ne remplace les deux autres.</p>
+<h2>La métrique de vérification</h2>
+<p>En faisant le parallèle à la programmation d&#39;outils systèmes comme le proposent les CLI, un programme est capable de donner un &quot;exit code&quot;.</p>
+<p>C&#39;est en utilisant toute l&#39;amplitude de ce code de retour qu&#39;on peut vérifier précisément les différents niveaux de contrôle. Un simple &quot;ça passe&quot; ou &quot;ça ne passe&quot; pas est une trop grosse approximation.</p>
+<pre><code>search · writes.searchTerm   runtime·emit   flot « filtrer » étape 1 — le handler n&#39;est jamais piloté
+search · slot list           runtime        expectRender, survit à l&#39;&quot;island&quot; nulle
+search · slot banner         static         placé, rendu ; aucun flot ne le distingue
+</code></pre>
+<p>Les niveaux vont de <code>unchecked</code> à <code>static</code>, <code>runtime·emit</code>, puis <code>runtime·user</code>.</p>
+<p>Ce que ça change : le résidu n&#39;est plus caché sous un vert, il est <strong>affiché</strong>. Une personne peut alors décider : écrire un test unitaire pour ce handler, ou accepter le risque en connaissance de cause. C&#39;est aussi la surface de relecture de la boucle de gauche : on n&#39;approuve pas seulement une déclaration, on approuve une déclaration <em>et</em> la part de celle-ci qui est réellement tenue.</p>
+<p>Pour rappel, et comme l&#39;explique le résultat du bench : tout cela vérifie la <strong>composition</strong>. La logique à l&#39;intérieur d&#39;un composant comme un filtre qui teste <code>some</code> au lieu de <code>every</code>, un off-by-one, relève des tests unitaires de l&#39;application. Ce sont deux instruments, il faut préserver les deux.</p>
+<h2>Au-delà du front, côté backend : assay</h2>
+<p>Le front a plusieurs gros avantages :</p>
+<ul>
+<li>l&#39;écran est une sortie qu&#39;on peut regarder.</li>
+<li>il est bien plus facile à morceler en blocs indépendants qui ont chacun des interactions, entre eux ou avec le serveur. Ce sont ici les &quot;islands&quot; / &quot;region&quot;.</li>
+</ul>
+<p>Une opération backend n&#39;a pas de sortie qu&#39;on peut regarder, ni de découpage toujours si clair. Son effet réel, c&#39;est ce qu&#39;elle a fait à la base de données, et c&#39;est invisible depuis la réponse HTTP comme depuis le source. assay, un autre outil que je construis, applique la même boucle à ce niveau : <em>découvrir, déclarer, vérifier</em>.</p>
+<p>Une opération (une Edge Function, une route d&#39;API) y joue le rôle de l&#39;island. En production, un petit module enregistre pour chaque requête SQL quelle table a été lue ou écrite, sur quelles colonnes on a filtré, si la sécurité au niveau ligne était contournée, et la <strong>forme</strong> des données envoyées, sans les valeurs. Ce journal est comparé à un fichier de déclaration, et l&#39;écart fait échouer la porte.</p>
+<p>On y retrouve les trois propriétés :</p>
+<ul>
+<li><strong>Vérifiable.</strong> Un changement de ce que touche une opération se lit en trois lignes (<code>+ writes: audit_log</code>) au lieu de quatre cents lignes de handler. C&#39;est ces trois lignes que l&#39;humain relit.</li>
+<li><strong>Non vide.</strong> La couverture compte par <strong>branche</strong>, pas par opération. Une opération n&#39;avait jamais été pilotée qu&#39;avec l&#39;envoi d&#39;emails désactivé : son écriture dans la table des emails n&#39;avait jamais été observée, donc jamais déclarée. Élargir ce seul scénario a fait passer son corpus de 15 à 119 requêtes.</li>
+<li><strong>Non écrite par le solveur.</strong> C&#39;est la piste la plus intéressante pour cet article. De plus en plus, personne n&#39;est devant le terminal : ce qui arrive à l&#39;humain, c&#39;est la phrase de l&#39;agent, <em>« j&#39;ai lancé les vérifications, tout est vert »</em>. Cette phrase est infalsifiable. <code>assay attest</code> produit donc une page <strong>écrite par l&#39;outil, pas par l&#39;agent</strong> : la liste des étapes est figée et ne peut pas être réduite en ligne de commande, une étape qui n&#39;a pas tourné est affichée avec sa raison, et le verdict n&#39;est jamais <code>PASS</code> si un niveau n&#39;a pas tourné : il devient <code>INCOMPLETE</code>.</li>
+</ul>
+<p>=&gt; Les deux outils se rejoignent sur une couture précise. Côté front, motu remplace le backend par des réponses choisies : il prouve que l&#39;écran se comporte bien <em>si</em> le backend répond telle forme. Côté backend, assay prouve quelle forme l&#39;opération envoie réellement. Chacun tient une moitié de l&#39;hypothèse ; ensemble, ils la ferment. Reste un trou que je ne cache pas : un client qui interroge la base directement, sans passer par une opération, n&#39;est déclaré par aucun des deux.</p>
+<p>L&#39;ouverture que ça suggère dépasse les deux outils : <strong>le rapport de vérification est lui-même une sortie à mesurer</strong>, et il ne doit pas passer par la bouche de celui qui a été vérifié.</p>
+<h2>Où l&#39;humain regarde encore</h2>
+<p>Alors, le code a-t-il encore de l&#39;importance ? Oui, mais ce n&#39;est plus là que l&#39;humain doit regarder. Ce qui doit être court, lisible et relu, c&#39;est la <strong>déclaration</strong> : ce que la région promet, qui possède chaque état, ce que chaque écran doit montrer.</p>
+<p>La différence est le niveau auquel on la fixe, et ce qu&#39;on lui demande : être lue, ou pouvoir refuser.</p>
+<p>Ce que je retiens, outil par outil :</p>
+<ul>
+<li><strong>motu : relire la déclaration, pas le composant.</strong> Ce qu&#39;on relit, c&#39;est la région : qui écrit quelle clé, quel état existe, à quelle URL on le voit. Le niveau atteint par chaque clé dit ce qui est réellement tenu. Le bench dit ce qui ne l&#39;est pas encore, et c&#39;est beaucoup.</li>
+<li><strong>assay : la même boucle, là où rien ne se voit.</strong> Le journal des opérations rend lisible un effet invisible : ce qu&#39;une requête a fait à la base. Et <code>assay attest</code> déplace le compte rendu : c&#39;est l&#39;outil qui écrit le verdict, pas l&#39;agent.</li>
+<li><strong>Le liant entre les deux.</strong> motu suppose une forme de réponse, assay la constate. L&#39;étape suivante serait de les brancher : que les formes observées par assay deviennent les données des scénarios motu, plutôt que deux hypothèses tenues chacune de son côté.</li>
+<li><strong>Ce qu&#39;aucun des deux ne voit.</strong> Deux morceaux de code peuvent être liés sans jamais s&#39;appeler : une même table, une même route, une même clé de configuration. C&#39;est le terrain de Seam, dont je parle dans <a href="/outil-agent-plus-cher/">un article précédent</a> : savoir ce qu&#39;un changement touche réellement, avant de se demander comment le vérifier.</li>
+</ul>
+<p>La question de départ reste ouverte, et c&#39;est tant mieux : <em>quelles sont les entrées et sorties mesurables d&#39;un produit ?</em> Pour le front, j&#39;ai ici une première réponse, avec ses limites. Je pense creuser le reste prochainement.</p>
+
+</article>
+<footer><a href="/">← Retour au blog</a></footer>
+</main>
+</body>
+</html>
