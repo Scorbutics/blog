@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Brouillon — Mes vérifications ralentissaient mes agents : de 26 à 9 minutes</title>
+<meta name="description" content="Comment j&#x27;ai fait passer les vérifications de motu de 26 à 9 minutes : un cache par empreinte de dépendances, et des workers en parallèle.">
+<style>
+:root{
+  --bg:#fdfdfc; --fg:#1b2227; --muted:#5b676d; --rule:#dfe4e4; --code-bg:#f2f4f4;
+  --accent:#2a6fbf; --quote:#eef3f8;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#12181b; --fg:#e2e8ea; --muted:#99a6ab; --rule:#2a353a; --code-bg:#1b2428;
+  --accent:#6aa8ee; --quote:#18232b;
+}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:17px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:46rem;margin:0 auto;padding:2.5rem 16px 4rem}
+.back,.section{font-size:.9rem}
+.section{color:var(--muted)}
+a{color:var(--accent)}
+h1{font-size:2rem;line-height:1.25;margin:1.2rem 0 .4rem}
+h2{font-size:1.45rem;line-height:1.3;margin:2.6rem 0 .8rem;padding-top:.4rem}
+h3{font-size:1.15rem;margin:2rem 0 .6rem}
+.meta{color:var(--muted);font-size:.9rem;margin-bottom:2rem}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5rem 0}
+blockquote{margin:1.2rem 0;padding:.6rem 1rem;background:var(--quote);border-left:3px solid var(--accent);color:var(--muted)}
+blockquote p{margin:.3rem 0}
+code{font:.86em/1.5 ui-monospace,"IBM Plex Mono",Menlo,Consolas,monospace;background:var(--code-bg);padding:.1em .3em;border-radius:3px;overflow-wrap:anywhere}
+pre{background:var(--code-bg);padding:.9rem 1rem;border-radius:6px;overflow-x:auto;line-height:1.45}
+pre code{background:none;padding:0;overflow-wrap:normal;font-size:.82rem}
+.table-wrap{overflow-x:auto;margin:1.2rem 0}
+table{border-collapse:collapse;font-size:.88rem;min-width:100%}
+th,td{border-bottom:1px solid var(--rule);padding:.45rem .6rem;text-align:left;vertical-align:top}
+th{border-bottom:2px solid var(--rule)}
+figure{margin:1.6rem 0 .4rem}
+figure img{display:block;width:100%;height:auto;border:1px solid var(--rule);border-radius:6px}
+figure + p em{color:var(--muted);font-size:.92rem}
+li{margin:.25rem 0}
+footer{margin-top:3rem;color:var(--muted);font-size:.9rem}
+.draft{margin:1rem 0 2rem;padding:.7rem 1rem;border:1px dashed var(--accent);border-radius:6px;background:var(--quote);font-size:.92rem}
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="/">← blog.bulgarelli.dev</a> · <span class="section">Brouillons</span>
+<article>
+<h1>Mes vérifications ralentissaient mes agents : de 26 à 9 minutes</h1>
+<p class="meta">Brice Bulgarelli · brouillon du 15 novembre 2026</p>
+<p class="draft"><strong>Brouillon.</strong> Première version, non publiée : le texte et les chiffres peuvent encore changer. Merci de ne pas la diffuser sans me demander.</p>
+<p>Dans l'article précédent, j'expliquais que je ne lis plus le code front que l'agent écrit : je fais confiance à un vérificateur, motu, qui rejoue chaque état déclaré de l'application dans un vrai navigateur.</p>
+<p>Sauf qu'un vérificateur, ça a un coût. Et ce coût a fini par me rattraper.</p>
+<h2>1. Le constat</h2>
+<p>Sur mon application principale (80 "islands", 23 "regions", 91 flows déclarés), un <code>motu check --runtime</code> complet prenait <strong>26 minutes</strong>. Et la version statique, celle censée tourner à chaque modification, prenait déjà <strong>plus de deux minutes</strong>.</p>
+<p>Le problème, c'est que les instructions que je donne aux agents leur demandaient de lancer ce check complet "une fois, avant de rendre la main". Résultat : chaque tâche, même une petite correction sur un seul écran, se terminait par une demi-heure d'attente. Les agents passaient plus de temps à attendre motu qu'à coder.</p>
+<p>Pire : ce temps ne dépend pas de ce qu'on a changé. Il grossit avec la taille de l'application. Plus le projet avance, plus chaque tâche coûte cher.</p>
+<h2>2. Mesurer avant de construire</h2>
+<p>Leçon retenue de Seam : avant de coder la moindre optimisation, je regarde où part réellement le temps.</p>
+<p>Le check tourne avec un mode <code>--verbose</code> qui chronomètre chaque étape. Sur les 26 minutes :</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Poste</th><th>Temps</th></tr></thead>
+<tbody>
+<tr><td>Flows des régions (dont mutants)</td><td>634 s</td></tr>
+<tr><td>Rejeu "island nulle" (173 scénarios)</td><td>301 s</td></tr>
+<tr><td>Hors de toute étape chronométrée</td><td>476 s (31 %)</td></tr>
+</tbody></table></div>
+<p>Deux choses sautent aux yeux :</p>
+<ul>
+<li><strong>Tout est séquentiel.</strong> Un seul serveur, un seul navigateur, une seule page, qui enchaîne les 103 cibles une par une. Sur une machine à 12 cœurs.</li>
+<li><strong>31 % du temps n'est mesuré nulle part.</strong> En creusant : chaque lecture d'un fichier de scénarios (<code>*.evidence.ts</code>) lance un process Node + tsx, environ 1 seconde. Et le même fichier était relu jusqu'à quatre fois par région. Quelques centaines de secondes à relire des fichiers qui n'avaient pas changé.</li>
+</ul>
+<p>Mais la vraie question, avant tout ça : <strong>combien de ces 26 minutes servent réellement à quelque chose ?</strong></p>
+<p>Si je modifie un composant de la page "profil", re-vérifier les 22 autres régions ne m'apprend rien. Leur résultat ne peut pas avoir changé.</p>
+<h2>3. Le cache : ne pas re-prouver ce qui est déjà prouvé</h2>
+<h3>L'idée</h3>
+<p>Le verdict d'une région dépend d'un ensemble fini de choses : les fichiers que le navigateur charge pour l'afficher, la version de motu, la version du navigateur, la configuration, les options du check. Rien d'autre, puisque tout tourne sur des fixtures avec un backend simulé.</p>
+<p>Donc si <strong>aucune</strong> de ces entrées n'a bougé depuis la dernière fois où le check a réussi, le résultat sera le même. On peut le rejouer au lieu de le recalculer.</p>
+<p>C'est le principe d'un cache de build (Bazel, Turborepo, Nx...), appliqué à des tests navigateur.</p>
+<h3>Pourquoi pas simplement <code>git diff</code> ?</h3>
+<p>motu avait déjà une option <code>--changed</code>, basée sur git : "quels fichiers ont changé, et à quelle island appartiennent-ils ?". Le souci, c'est qu'elle ne raisonne que sur les <strong>chemins</strong> : un fichier qui n'est pas dans le dossier d'une island (la page, un utilitaire partagé, un fichier de fixtures commun...) ne peut être attribué à personne, et dans le doute, tout est relancé. En pratique, presque à chaque fois.</p>
+<p>Ce qu'il faut, ce n'est pas "où est le fichier", c'est "<strong>qui l'importe</strong>".</p>
+<h3>Simuler avant de coder</h3>
+<p>Avant d'écrire le cache, j'ai fait une simulation rapide : construire le graphe d'imports de chaque island et de chaque région (avec esbuild, qui sait résoudre les alias exactement comme le bundler), puis rejouer les <strong>293 derniers commits</strong> du projet pour voir ce que chacun aurait invalidé.</p>
+<p>Résultat :</p>
+<ul>
+<li>61 % des commits ne touchent que du code applicatif. Ceux-là n'invalident en moyenne que <strong>4 régions sur 23</strong> et <strong>12 islands sur 80</strong>. Environ 83 % du travail évité.</li>
+<li>39 % des commits invalident tout : une mise à jour de motu lui-même, ou un fichier global (configuration, dépendances).</li>
+</ul>
+<p>=&gt; Sur l'historique complet, le cache aurait évité environ la moitié du travail. Pour un développeur qui travaille sur une fonctionnalité, c'est bien plus.</p>
+<h3>L'empreinte</h3>
+<p>Concrètement, pour chaque cible, motu calcule une <strong>empreinte</strong> (un hash) de tout ce dont son verdict dépend :</p>
+<ul>
+<li>le contenu de chaque fichier de son graphe d'imports (y compris le code de l'application, pas seulement celui de motu) ;</li>
+<li>les islands d'une région, et les régions avec lesquelles elle compose ;</li>
+<li>les versions des packages qu'elle importe ;</li>
+<li>la version de motu, du navigateur, la config, et les options du check.</li>
+</ul>
+<p>Le calcul de toutes les empreintes du projet prend <strong>1,8 seconde</strong> (la première version prenait 7,7 s : elle relisait chaque fichier une fois par graphe qui le contenait).</p>
+<p>Et la preuve que l'attribution est juste, en modifiant temporairement un fichier à la fois :</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Fichier modifié</th><th>Empreintes qui changent</th></tr></thead>
+<tbody>
+<tr><td>Le fichier de scénarios d'une région</td><td>cette région, et rien d'autre</td></tr>
+<tr><td>Un composant de l'application</td><td>les 3 régions qui l'importent réellement</td></tr>
+<tr><td><code>lib/utils.ts</code>, importé partout</td><td>tout le projet (c'est voulu)</td></tr>
+<tr><td>Rien</td><td>rien</td></tr>
+</tbody></table></div>
+<h3>Les règles qui rendent le cache honnête</h3>
+<p>Un cache de tests, c'est dangereux : un résultat faux rejoué indéfiniment est pire qu'un test lent. Quatre règles :</p>
+<ul>
+<li><strong>Seuls les verdicts propres sont gardés.</strong> Une erreur, ou un check qui n'a pas pu tourner, est toujours relancé. Un test instable ne doit pas devenir un échec permanent.</li>
+<li><strong>Un rejeu n'est jamais silencieux.</strong> Chaque ligne rejouée le dit : <code>· runtime replayed — inputs unchanged since proved 3h ago</code>, et le verdict final compte ce qui a été re-prouvé et ce qui a été rejoué.</li>
+<li><strong>Ce qui lit l'horloge est re-prouvé chaque jour.</strong> Un composant qui appelle <code>new Date()</code> peut s'afficher différemment demain : sa date fait partie de l'empreinte.</li>
+<li><strong>Une seule option pour tout relancer</strong> : <code>--no-cache</code>. Et <code>--max-age 7d</code> pour re-prouver périodiquement ce qui est rejoué depuis trop longtemps.</li>
+</ul>
+<p>Résultat sur une région inchangée : <strong>72 s → 21 s</strong>.</p>
+<h2>4. Le check statique : la même erreur, en plus petit</h2>
+<p>En profilant le check statique (celui qui tourne à chaque modification), j'ai retrouvé exactement le même schéma que dans le runtime : du travail refait pour rien.</p>
+<p>La vérification d'intégration parcourait l'arbre syntaxique de <strong>tous les fichiers de l'application</strong>, quatre à cinq fois, <strong>pour chacune des 23 régions</strong>. 78 secondes sur 106, passées à relire les mêmes fichiers.</p>
+<p>Trois caches, de quelques lignes chacun :</p>
+<ul>
+<li>parcourir l'arbre de chaque fichier une seule fois par type de nœud ;</li>
+<li>lire les déclarations de régions une fois, tant qu'aucun fichier concerné n'a changé ;</li>
+<li>retirer les commentaires d'un fichier une seule fois, au lieu d'une fois par région.</li>
+</ul>
+<p>Résultat : <strong>147 s → 33 s</strong>. Et pour m'assurer que rien n'a changé dans les résultats, j'ai comparé la sortie JSON complète avant et après : identique, section par section.</p>
+<h2>5. Les workers : utiliser les 12 cœurs</h2>
+<p>Le cache ne sert à rien sur un run "à froid" : la CI de nuit, ou après une mise à jour de motu. Là, il faut que le run complet lui-même soit plus rapide.</p>
+<p>Le plus gros levier était évident : tout tournait sur <strong>un seul navigateur, une page après l'autre</strong>.</p>
+<h3>Pourquoi des process, et pas du parallélisme dans le même process</h3>
+<p>Le code qui pilote le navigateur garde de l'état global : la page en cours, les journaux de diagnostic, quelques délais. Le rendre parallélisable aurait demandé de tout réécrire.</p>
+<p>Plus simple : lancer plusieurs <strong>workers</strong>, chacun dans son propre process, avec son propre serveur et son propre navigateur. Le process principal garde la main sur tout le reste :</p>
+<ul>
+<li>il distribue les cibles par une file d'attente, <strong>les plus longues d'abord</strong> (pour ne pas finir avec une grosse région qui démarre en dernier) ;</li>
+<li>les workers lui renvoient leurs résultats sous forme de données ;</li>
+<li>c'est lui seul qui affiche, ordonne et décide du code de sortie. Un run parallèle se lit exactement comme un run séquentiel.</li>
+</ul>
+<h3>Deux pièges</h3>
+<ul>
+<li><strong>Le cache de dépendances de Vite.</strong> Au premier démarrage, Vite pré-compile les dépendances dans un dossier partagé. Quatre process qui le font en même temps, c'est une course. Solution : le premier worker démarre seul, sur la cible la plus petite, et les autres attendent qu'il ait répondu.</li>
+<li><strong>Un worker qui meurt.</strong> Sa cible n'est ni "réussie" ni "échouée" : elle est marquée <strong>INCONCLUSIVE</strong> (code de sortie 2 : "relancez, ne corrigez rien"). Un agent qui lit un échec cherche un bug ; il ne faut pas lui en inventer un.</li>
+</ul>
+<p>Par défaut : la moitié des cœurs, plafonnée à 4 et limitée par la mémoire disponible, et un seul worker quand il y a peu de cibles (démarrer un worker coûte une quinzaine de secondes).</p>
+<p>Résultat sur 4 grosses régions et leurs 31 islands : <strong>410 s sur 1 worker, 177 s sur 4</strong>, avec des verdicts identiques sur les 103 cibles.</p>
+<p>Et sur le run complet, à froid, caches vidés : <strong>26 min → 8 min 56</strong>.</p>
+<h2>6. Ce qui a changé dans la façon de travailler</h2>
+<p>Le gain de temps est une chose. Le vrai changement, c'est la règle donnée aux agents :</p>
+<ul>
+<li><strong>Pour terminer une tâche</strong> : le check statique (<code>motu check</code>, une trentaine de secondes) et la vérification d'intégration.</li>
+<li><strong>Quand on ajoute ou modifie une partie de l'écran</strong> : un check navigateur <strong>ciblé</strong> sur ce qu'on a construit, <code>motu check --region &lt;id&gt;</code> ou <code>--island &lt;nom&gt;</code>. Le reste du projet reste vérifié statiquement dans le même run.</li>
+<li><strong>Le run complet</strong> (<code>motu check --runtime</code>) n'est plus jamais lancé par un agent. C'est le travail de la CI, la nuit.</li>
+</ul>
+<p>=&gt; Le coût d'une tâche dépend maintenant de ce qu'elle touche, plus de la taille du projet.</p>
+<h2>7. Limites</h2>
+<ul>
+<li><strong>Le run complet n'est pas vraiment comparable.</strong> Les 26 minutes ont été mesurées avec la version de motu embarquée dans le projet, les 8 min 56 avec la version de développement, qui fait échouer certains flows de cette application (une incompatibilité que j'ai trouvée en chemin, et qui existe sans mes changements). Ce qui est garanti : sur les mêmes cibles, 1 ou 4 workers donnent exactement les mêmes verdicts.</li>
+<li><strong>Le cache ne voit que ce qu'on lui donne.</strong> Tout ce que l'empreinte ne capture pas (une variable d'environnement hors <code>MOTU_*</code>, une donnée lue au runtime...) est un angle mort. D'où <code>--max-age</code> : re-prouver régulièrement, même sans changement.</li>
+<li><strong>Un fichier partagé invalide tout.</strong> Modifier <code>lib/utils.ts</code> relance tout le projet. C'est juste, mais c'est là que les workers restent indispensables.</li>
+<li><strong>Il reste du gras.</strong> Le rejeu "island nulle" coûte encore environ 300 secondes, et chaque scénario attend des délais fixes. Ce sera pour une prochaine fois.</li>
+</ul>
+<h2>8. À vos tests</h2>
+<ul>
+<li>Le commit : <code>45c8c91</code> sur motu, <code>perf(check): replay unchanged runtime verdicts, scope the browser pass, run it on lanes</code>.</li>
+<li><code>motu check --region &lt;id&gt;</code> : le navigateur sur une région, le statique sur tout le reste.</li>
+<li><code>motu check --runtime --jobs auto --verbose</code> : le run complet sur plusieurs workers, avec le temps de chaque cible.</li>
+<li><code>motu check --runtime --no-cache</code> : tout re-prouver.</li>
+</ul>
+<p><em>Le code a été écrit avec Claude Code sous ma direction.</em></p>
+
+</article>
+<footer><a href="/">← Retour au blog</a></footer>
+</main>
+</body>
+</html>
